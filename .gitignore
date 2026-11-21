@@ -1,0 +1,6 @@
+.DS_Store
+*.png
+report-*.txt
+state.env
+bench/
+chrome-profile/
