@@ -23,9 +23,9 @@ Set `VPN_KEY` (EnvironmentVariables in the plist) if the VPN's resolver key is n
 
 ## Verify
 
-`scutil --dns` → resolver #1 = 198.18.0.1, company domains → the VPN resolver, no search domains added;
+`scutil --dns` → lowest-`order` catch-all resolver is `198.18.0.1` (`order: 50000`, set via `SupplementalMatchOrders`), company domains → the VPN resolver (`order: 40000+`), LAN domains → primary DHCP DNS (`order: 45000+`), no search domains added; `/etc/resolv.conf` points to `198.18.0.1`;
 `dnsleak.sh` → system DNS answered by Clash; intranet hosts still resolve to internal IPs and work.
-Fail-safe test: `touch /Users/Shared/clash-dns-guard.disable` → within ~3 s resolver #1 is the VPN again;
+Fail-safe test: `touch /Users/Shared/clash-dns-guard.disable` → within ~3 s guard withdraws and restores `/var/run/resolv.conf`;
 remove the file → back to Clash. Log: `/usr/local/clash-dns-guard/guard.log`.
 
 ## Remove

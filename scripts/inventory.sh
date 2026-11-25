@@ -89,9 +89,30 @@ scutil --proxy | awk '/Enable|Proxy :|Port/ {print}' | tr -s ' ' | while read -r
 section "System DNS chain (scutil --dns, first resolvers)"
 scutil --dns | awk '/^resolver #/ {n++} n>=1 && n<=4' | grep -E 'resolver #|domain|nameserver|flags|order' | sed 's/^ *//' >"$OUT/dns-chain.txt"
 cat "$OUT/dns-chain.txt" | head -24 | while read -r l; do tag INFO "$l"; done
-first_ns=$(scutil --dns | awk '/^resolver #1/ {on=1} on && /nameserver\[0\]/ {print $3; exit}')
-first_dom=$(scutil --dns | awk '/^resolver #1/ {on=1} on && /domain/ {print $3; exit} on && /^$/ {exit}')
-tag INFO "resolver #1 = $first_ns ${first_dom:+(domain $first_dom)}"
+first_ns=$(scutil --dns | awk '
+  /^DNS configuration \(for scoped queries\)/ { exit }
+  /^resolver #[0-9]+/ {
+    if (in_res && dom == "" && ns != "" && (best_ord == "" || ord + 0 < best_ord + 0)) {
+      best_ord = ord; best_ns = ns
+    }
+    in_res = 1; dom = ""; ns = ""; ord = 999999999; next
+  }
+  in_res && /^[[:space:]]*domain[[:space:]]*:/ { dom = $3 }
+  in_res && /^[[:space:]]*nameserver\[0\][[:space:]]*:/ { ns = $3 }
+  in_res && /^[[:space:]]*order[[:space:]]*:/ { ord = $3 }
+  END {
+    if (in_res && dom == "" && ns != "" && (best_ord == "" || ord + 0 < best_ord + 0)) {
+      best_ns = ns
+    }
+    print best_ns
+  }')
+first_dom=""
+tag INFO "effective catch-all resolver (lowest order) = $first_ns"
+resolv_ns=$(awk '/^nameserver / {print $2; exit}' /etc/resolv.conf 2>/dev/null)
+tag INFO "/etc/resolv.conf nameserver = ${resolv_ns:-<none>}"
+if tun_enabled && [ -n "$resolv_ns" ] && [ "$resolv_ns" != "$(tun_dns)" ]; then
+  tag WARN "/etc/resolv.conf points to $resolv_ns (not Clash $(tun_dns)): CLI tools reading /etc/resolv.conf (dig/Go/c-ares) may bypass Clash DNS"
+fi
 for k in $(printf 'list State:/Network/Service/[^/]+/DNS\nquit\n' | scutil | awk '{print $4}'); do
   d=$(printf 'show %s\nquit\n' "$k" | scutil)
   if echo "$d" | grep -q SupplementalMatchDomains && echo "$d" | awk '/SupplementalMatchDomains/ {on=1; next} on && /0 :/ {print; exit}' | grep -qE '0 : *$'; then
@@ -156,7 +177,7 @@ section "Chrome"
 CH=$(ls -d "/Applications/Google Chrome.app" "$HOME/Applications/"*"/Google Chrome.app" "$HOME/Applications/Google Chrome.app" 2>/dev/null | head -1)
 if [ -n "$CH" ]; then
   tag INFO "Chrome $(defaults read "$CH/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null) at $CH"
-  for src in "/Library/Managed Preferences/com.google.Chrome" "/Library/Managed Preferences/$USER/com.google.Chrome" com.google.Chrome; do
+  for src in "/Library/Managed Preferences/com.google.Chrome" "/Library/Managed Preferences/$USER/com.google.Chrome" "/Library/Preferences/com.google.Chrome" com.google.Chrome; do
     for k in WebRtcIPHandling WebRtcIPHandlingPolicy DnsOverHttpsMode; do
       v=$(defaults read "$src" "$k" 2>/dev/null) && tag INFO "policy $k=$v ($src)"
     done

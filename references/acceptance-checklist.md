@@ -1,46 +1,76 @@
-# 原始任务要求（验收清单）
+# Task Specification & Acceptance Checklist
 
-这份 skill 源自下面这份要求。复用到其他机器时，诊断和修复都以它为准。
+This skill is grounded in the following end-to-end diagnostic, remediation, and verification
+requirements. When reusing this skill on another machine, both diagnosis and remediation must satisfy
+this checklist. Always deliver final reports and user-facing explanations in the **user's conversation
+language**.
 
-## 一、先检查，再修改
-- 识别本机系统、Clash 版本、当前生效配置、系统代理、TUN、DNS、IPv6，以及其他 VPN/隧道。
-- 检查 Clash 与公司 VPN 是否存在虚拟网卡、路由、DNS 或地址段冲突。
-- 先备份现有配置，并设置独立于当前会话运行的自动回滚；连接验证通过后再取消回滚。
-- 不重装、不修改 VPS、不购买额外服务，不删除现有数据，不影响公司内网及已有连接。
-- 缺少权限或连接资料时，只询问必要信息；密码由用户在安全界面输入。
+## I. Inspect First, Modify Second
 
-## 二、分流目标
-1. 本机与局域网：DIRECT，使用本地解析。
-2. 公司内网：保留公司 VPN 的路由和内部 DNS，不被 Clash 接管或错误分流。
-3. 国内 AI、国内网站和 CDN：DIRECT，使用直连的国内加密 DNS。
-4. Claude、OpenAI、ChatGPT、Codex、Gemini 等海外服务：经自己的 VPS，DNS 使用经 VPS 访问的海外 DoH。
-5. 其他海外和未匹配流量：默认经 VPS，DNS 同样经 VPS。
+- Identify the host OS, Clash Verge Rev / mihomo version, **currently active** effective configuration,
+  system proxy, TUN, DNS, IPv6, and any other VPNs or tunnels.
+- Check whether Clash and a company VPN have virtual NIC (`utun`), routing, DNS, or CIDR conflicts.
+- Back up existing configurations first and arm an **auto-rollback running independently of the current
+  session** (e.g. a `launchd` job); cancel the rollback only after live connectivity and leak checks pass.
+- Do **not** reinstall clients, do **not** modify the VPS, do **not** purchase extra services, do **not**
+  delete existing data, and do **not** disrupt company intranet access or existing connections.
+- When permissions or connection details are missing, ask only for the minimal necessary information;
+  passwords must be entered by the user via a secure prompt, never in plain chat.
 
-## 三、DNS 与 TUN
-- 海外域名不得因解析失败而回退到国内 DNS。
-- 检查浏览器安全 DNS、系统 DNS、Clash DNS 之间是否存在绕行。
-- 根据当前生效配置设置 nameserver-policy 等规则，不能只修改一个未生效的配置文件。
-- 使用 fake-ip 时，地址段必须避开公司隧道和现有路由。
-- 先确认基础连接正常，再开启 TUN 和 DNS 接管，避免断网。
-- 保留 UDP，检查 TCP、UDP 和 IPv6 是否按预期分流。
+## II. Routing & DNS Targets
 
-## 四、实际验收
-- 使用至少两个检测网站核对海外出口 IP 是否与 VPS 出口一致。（`exits.sh`）
-- 对海外测试域名验证 DNS 上游和实际路径，不能仅核对配置文本。（`dnsleak.sh`、`route_check.sh`）
-- 验证海外 AI 域名连接和 DNS 均经 VPS；排查期间不要打开 Claude 登录。（`exits.sh`、`route_check.sh`）
-- 抽查国内网站直连，以及公司内网网站、内部 IP、SSH 等仍可访问。（`exits.sh`；内网需手动指定主机测试）
-- 单独测试 UDP 与浏览器 WebRTC；海外 STUN 不应暴露本地公网出口，应按预期经 VPS。（`udp_check.sh`、`browser_check.sh`）
-- 检查 IPv6 是否绕过代理。（`inventory.sh`；无 IPv6 网络时标注未测）
-- 重启客户端后再次验证，确认配置持久生效。（重启 Verge 后重跑 `run_all.sh`）
-- 不把客户端绿灯、配置检查通过或模板生成当作部署成功。
+1. **Localhost & LAN:** `DIRECT`, using local resolution (DHCP LAN DNS / mDNS / `/etc/hosts`).
+2. **Company intranet:** Preserve the company VPN's routes and internal DNS; never hijacked or misrouted
+   by Clash.
+3. **Domestic (CN) AI, CN websites, and CN CDNs:** `DIRECT`, using direct domestic encrypted DNS (DoH).
+4. **Overseas AI services (Claude, OpenAI, ChatGPT, Codex, Gemini, etc.):** Routed via the user's VPS,
+   with DNS using overseas DoH accessed through the VPS.
+5. **Other overseas and unmatched traffic:** Default via the user's VPS, with DNS likewise via the VPS.
 
-## 五、交付
-- 给出实际原因、修改文件及修改内容、实测结果、未完成项和回滚方法。
-- 报告脱敏，不展示密码、密钥或订阅凭据。
-- 无法实测的项目明确标注，不声称已经验证通过。
+## III. DNS & TUN
 
-## 常见附加诉求（来自实际使用）
-- 只开系统代理或只开 TUN，任意一个都应能正常工作。
-- 公司 VPN（飞连 CorpLink）开启时不与系统代理冲突。
-- TUN 不与 Tailscale 冲突。
-- 页面（如 Gemini）显示异常时，排查直连规则与 DNS 是否错配、QUIC 是否导致出口 IP 不一致、链路带宽。
+- Overseas domains must **never** fall back to domestic DNS on resolution failure.
+- Check for any bypass across browser Secure DNS (DoH), system DNS (`scutil --dns` and
+  `/etc/resolv.conf`), and Clash DNS.
+- Configure `nameserver-policy` and routing rules in the **currently active** effective config — never
+  modify only an unused config file.
+- When using `fake-ip`, ensure `fake-ip-range` avoids company tunnels and existing routes (and exclude
+  private/company/Tailscale ranges from TUN routes).
+- Confirm base proxy connectivity works before enabling TUN and DNS takeover to avoid cutting off the
+  network.
+- Keep UDP enabled; verify that TCP, UDP, and IPv6 are routed as expected.
+
+## IV. Live Acceptance Verification
+
+- Verify overseas exit IP matches the VPS exit using **at least two independent check sites** (`exits.sh`,
+  browser checks).
+- Verify the **actual DNS upstream and resolution path** for overseas test domains — never rely on
+  reading config text alone (`dnsleak.sh`, `route_check.sh`, `browserleaks.com/dns`, `ipleak.net`).
+- Verify overseas AI domains route both connections and DNS through the VPS; **do not open Claude login**
+  during troubleshooting (`exits.sh`, `route_check.sh`, live core logs).
+- Spot-check domestic websites & domestic AI for direct routing, and verify company intranet websites,
+  internal IPs, internal DNS, and SSH remain accessible (`exits.sh` + targeted intranet/SSH probes).
+- Independently test **UDP and browser WebRTC**; overseas STUN must not expose the local public ISP IP
+  (or company VPN IP) and must exit via the VPS as expected (`udp_check.sh`, `browser_check.sh`,
+  `browserleaks.com/webrtc`, `ipleak.net`).
+- Check whether **IPv6 bypasses the proxy** (`inventory.sh`, `curl -6`, browser IPv6 test; mark as
+  untested if the current network has no global IPv6).
+- **Restart the Clash client and verify again** to confirm all changes persist across restarts.
+- Never treat a green client indicator, a config syntax check, or a generated template as successful
+  deployment.
+
+## V. Deliverable Requirements
+
+- Report (in the user's conversation language): actual root cause(s), modified files and exact changes,
+  live test results, incomplete/untested items, and rollback instructions.
+- Sanitize the report: never expose passwords, keys, UUIDs, tokens, or subscription credentials.
+- Explicitly mark any item that could not be tested live; never claim it passed verification.
+
+## Common Additional Real-World Requirements
+
+- System-proxy-only mode or TUN-only mode should each work cleanly without requiring both simultaneously.
+- Company VPN (e.g. CorpLink / 飞连) must not conflict with system proxy or TUN DNS.
+- TUN must not conflict with Tailscale (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`, `*.ts.net`).
+- When web apps (such as Gemini) render abnormally or trigger "unusual traffic", check for mismatched
+  GoogleCN direct rules vs. overseas DNS, QUIC (UDP/443) exit-IP mismatch vs. TCP/WARP, and relay
+  bandwidth bottlenecks.

@@ -42,6 +42,8 @@ start || { tag FAIL "headless Chrome did not start"; exit 0; }
 pol=$(cdp policy); stop
 if [ -n "$pol" ]; then echo "$pol" | while read -r l; do tag INFO "$l"; done; else tag INFO "could not read chrome://policy"; fi
 echo "$pol" | grep -qE 'WebRtcIPHandling disable_non_proxied_udp' && tag PASS "WebRtcIPHandling=disable_non_proxied_udp is enforced"
+echo "$pol" | grep -qE 'WebRtcIPHandling default_public_interface_only' && tag PASS "WebRtcIPHandling=default_public_interface_only is active (TUN mode)"
+echo "$pol" | grep -qE 'DnsOverHttpsMode off' && tag PASS "DnsOverHttpsMode=off is active (prevents DoH bypass)"
 
 section "WebRTC candidates"
 for mode in tun proxy; do

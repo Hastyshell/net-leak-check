@@ -55,7 +55,7 @@ scripts/                         run_all.sh, inventory.sh, exits.sh, dnsleak.sh,
 references/root-causes.md        symptom → cause → evidence → fix
 references/fix-templates.md      generic DNS / rules / UDP / QUIC / TUN / Chrome templates
 references/templates/clash-dns-guard/   root daemon for coexisting with a VPN's catch-all resolver
-references/acceptance-checklist.md      the original task brief (Chinese)
+references/acceptance-checklist.md      end-to-end task specification & acceptance checklist (English; reports follow user's language)
 ```
 
 ## License
